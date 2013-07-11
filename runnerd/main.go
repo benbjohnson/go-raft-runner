@@ -6,6 +6,7 @@ import (
 	"log"
 	"io/ioutil"
 	"github.com/benbjohnson/go-raft"
+	"github.com/benbjohnson/go-raft-runner"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ var logLevel string
 
 func init() {
 	flag.StringVar(&logLevel, "log-level", "", "log level (debug, trace)")
+	raft.RegisterCommand(&runner.JoinCommand{})
 }
 
 //------------------------------------------------------------------------------
@@ -47,7 +49,16 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	server.StartFollower()
+	if err = server.Initialize(); err != nil {
+		log.Fatalln(err)
+	}
+	
+	if server.IsLogEmpty() {
+		server.StartLeader()
+		server.Do(&runner.JoinCommand{Name:name})
+	} else {
+		server.StartFollower()
+	}
 
 	// Setup HTTP server.
     mux := http.NewServeMux()
